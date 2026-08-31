@@ -361,9 +361,9 @@ def send_brief_email():
     try:
         with open("daily_brief.md", "r", encoding="utf-8") as f:
             content = f.read()
-    except FileNotFoundError:
-        print("⚠️ 没找到 daily_brief.md，先跑 run_all.py 生成简报")
-        return
+    except FileNotFoundError as e:
+        print("❌ 没找到 daily_brief.md，无法发送邮件")
+        raise RuntimeError("daily_brief.md 不存在") from e
 
     date, slot, sections = parse_brief(content)
     html_content = build_html(date, slot, sections)
@@ -375,16 +375,23 @@ def send_brief_email():
     msg["Subject"] = Header(f"每日简报·{slot_tag} {date}", "utf-8")
 
     try:
-        server = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT)
-        server.login(QQ_EMAIL, QQ_AUTH_CODE)
-        server.sendmail(QQ_EMAIL, [SEND_TO], msg.as_string())
-        server.quit()
+        with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) as server:
+            server.login(QQ_EMAIL, QQ_AUTH_CODE)
+            server.sendmail(QQ_EMAIL, [SEND_TO], msg.as_string())
+
         print(f"✅ 简报已发送到 {SEND_TO}")
+
         if slot == "morning":
             seen_items = collect_seen_items(sections)
             seen_records.record_today(date, seen_items)
+
     except Exception as e:
         print(f"❌ 发送失败：{e}")
+        raise
+
+
+if __name__ == "__main__":
+    send_brief_email()
 
 
 if __name__ == "__main__":
