@@ -79,3 +79,6 @@ for step in steps:
 
 if all_ok:
     print(f"\n✅ 全部完成！{slot_label}简报已生成并发送")
+else:
+      sys.exit(1)
+  
