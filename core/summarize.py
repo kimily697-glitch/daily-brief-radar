@@ -32,7 +32,6 @@ import sys
 import time
 import urllib.parse
 import requests
-import seen_records
 from datetime import datetime
 
 # ============ DeepSeek API Key：从环境变量读取（GitHub Secrets 里配置） ============
@@ -87,14 +86,7 @@ USER_PROFILE_FULL = """这个人叫{name}，下面是她通过问卷填写的个
 
 {jargon_rule}""".format(name=USER_NAME, profile=USER_PROFILE_TEXT, jargon_rule=NO_JARGON_RULE)
 
-# 阶段三：早晚班次判断。命令行传参优先，不传就按当前时间自动判断（12点前=早班）
-def get_slot():
-    if len(sys.argv) > 1 and sys.argv[1] in ("morning", "evening"):
-        return sys.argv[1]
-    return "morning" if datetime.now().hour < 12 else "evening"
-
-
-def generate_greeting(slot, todo_hint, action_hint):
+def generate_greeting(todo_hint, action_hint):
     """生成开头问候语+结尾结束语。
 
     【本次修复】之前问候语天天都差不多，原因有两个：
@@ -105,21 +97,15 @@ def generate_greeting(slot, todo_hint, action_hint):
        而不是完全指望AI自己"想着要不一样"
     另外，之前漏了你要的两块内容：提醒今天该做的事、健康小知识（喝水之类），这次加上了。
     """
-    if slot == "morning":
-        mood_rule = """现在是早上，写给刚起床准备开始一天的她。语气要像朋友一样自然温暖，
+    mood_rule = """现在是早上，写给刚起床准备开始一天的她。语气要像朋友一样自然温暖，
 提醒她看一眼今天的安排、准备开始行动。"""
-        health_pool = ["记得喝水", "起来活动一下、别久坐", "好好吃早饭", "让眼睛歇一歇别一直盯屏幕",
-                       "做几个深呼吸调整状态", "有空开窗透透气、晒会儿太阳"]
-    else:
-        mood_rule = """现在是晚上，写给结束一天准备休息的她。语气要轻松放松，
-提醒她早点休息、别熬夜，给明天留点好状态。"""
-        health_pool = ["早点放下手机去睡觉", "睡前别再想工作的事，让脑子歇一歇", "记得泡个脚或者洗个热水澡放松一下",
-                       "睡前拉伸一下肩颈", "别熬夜刷手机，眼睛也需要休息", "给明天定个好闹钟，好好睡一觉"]
+    health_pool = ["记得喝水", "起来活动一下、别久坐", "好好吃早饭", "让眼睛歇一歇别一直盯屏幕",
+                   "做几个深呼吸调整状态", "有空开窗透透气、晒会儿太阳"]
 
     health_topic = random.choice(health_pool)
     tone_anchor = random.choice([
         "像刚聊完天顺口说一句的语气", "像发消息提醒朋友的语气", "简短利落，不要铺垫太多",
-        "带点俏皮但不浮夸", "平静温和，像很熟的朋友", "直接一点，像在催她赶紧行动/休息",
+        "带点俏皮但不浮夸", "平静温和，像很熟的朋友", "直接一点，像在催她赶紧行动",
     ])
 
     prompt = f"""这个人叫{USER_NAME}。请你以"每日AI简报"这个AI助手的身份，给她写一段开头问候和一段结尾道别。
@@ -138,8 +124,8 @@ def generate_greeting(slot, todo_hint, action_hint):
 写作要求：
 - 这次的语气基调：{tone_anchor}
 - 开头问候2句话左右，40字以内
-- 结尾道别1句话，20字以内，呼应今晚/明天
-- 不要写"祝你度过美好的一天""祝你晚安好梦"这种通用客套话
+- 结尾道别1句话，20字以内，呼应今天的行动
+- 不要写"祝你度过美好的一天"这类通用客套话
 - 不要写日期、天气这类你不确定的信息
 - 每次遣词造句都要有变化，避免使用固定的开头句式
 
@@ -192,25 +178,19 @@ def load_json(filename):
         return None
 
 
-# ============ 当天早晚去重 ============
-# 早上发完邮件后，把当天看过的新闻（标题+链接）记到 D 盘；晚上跑的时候：
-# 1) 链接完全一样的直接从候选里划掉（filter_seen）
-# 2) 把早上的标题也告诉 AI，即使换了网站、换了标题，同一件事也不重复选（seen_block_text）
-
-
 def filter_seen(items, seen_urls):
-    """从候选列表里划掉今天早上已经看过的链接"""
+    """按给定链接集合过滤候选项。"""
     if not items or not seen_urls:
         return items
     return [x for x in items if (x.get("url") or "").strip() not in seen_urls]
 
 
 def seen_block_text(seen_titles):
-    """把早上看过的标题整理成给 AI 的提示语；没有就不加"""
+    """把已排除标题整理成给 AI 的提示语；没有就不加。"""
     if not seen_titles:
         return ""
     lines = "\n".join(f"- {t}" for t in seen_titles[:40])
-    return ("另外，下面这些内容今天早上已经推送过了，即使换了标题、换了来源，"
+    return ("另外，下面这些内容已经推送过了，即使换了标题、换了来源，"
             "只要讲的是同一件事就绝对不能再选：\n" + lines + "\n\n")
 
 
@@ -572,19 +552,14 @@ def summarize_overview(jwc_text, tech_text):
 
 
 if __name__ == "__main__":
-    slot = get_slot()
-    slot_label = "早班" if slot == "morning" else "晚班"
-    print(f"正在生成今日简报（{slot_label}）...\n")
+    slot = "morning"
+    print("正在生成今日早间简报...\n")
 
     today = datetime.now().strftime("%Y-%m-%d")
     sections = {}
 
-    # 当天早晚去重：早上看过的内容记录在 D 盘，晚上读出来避开
-    seen_items = seen_records.get_seen_today() if slot == "evening" else []
-    seen_urls = {x.get("url", "") for x in seen_items if x.get("url")}
-    seen_titles = [x.get("title", "") for x in seen_items if x.get("title")]
-    if seen_titles:
-        print(f"今天早上已看过 {len(seen_titles)} 条新闻，晚上会自动避开这些内容")
+    seen_urls = set()
+    seen_titles = []
 
     jwc_data = load_json("jwc_news.json")
     if jwc_data:
@@ -681,9 +656,8 @@ if __name__ == "__main__":
         )
         print(sections["action"] + "\n")
 
-    print(f"正在生成{slot_label}问候语...")
+    print("正在生成早间问候语...")
     sections["greeting"] = generate_greeting(
-        slot,
         sections.get("overview", "（今天没有总览内容）"),
         sections.get("action", "（今天没有行动建议）"),
     )

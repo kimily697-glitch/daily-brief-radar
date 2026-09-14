@@ -148,7 +148,7 @@
     <div class="eyebrow">Fork once · Run forever · Free</div>
     <h1>训练一台只为你扫描信息的雷达</h1>
     <p>不是又一个"AI资讯订阅"。填一份两分钟的问卷，AI 就会照着你的目标、阶段和口味，
-       每天早晚从 GitHub / Hacker News / RSS（以及西南交大同学专属的教务网通知）里挑内容、写解读、给行动建议，
+       每两天早上从 GitHub / Hacker News / RSS（以及西南交大同学专属的教务网通知）里挑内容、写解读、给行动建议，
        发到你自己的邮箱。整个流程跑在你自己的 GitHub 账号上，完全免费，没有人能看到你的数据。</p>
     <div class="hero-actions">
       <a class="btn btn-primary" href="javascript:void(0)" id="startBtn">开始设置 →</a>
@@ -158,7 +158,7 @@
 
     <div class="signal-panel">
       <div class="signal-greeting" id="pvGreeting">你好 👋 先在下面填几个问题，这里会实时显示 AI 会怎么跟你说话</div>
-      <div class="signal-body" id="pvBody">早晚问候的语气、挑的内容类型、给建议的方式——都会跟着你的答案变。</div>
+      <div class="signal-body" id="pvBody">早间问候的语气、挑的内容类型、给建议的方式——都会跟着你的答案变。</div>
       <div class="signal-tags" id="pvTags"></div>
     </div>
   </div>
@@ -207,28 +207,12 @@
     <div class="card">
       <h3>① DeepSeek API Key（AI摘要用）</h3>
       <p>打开 <a href="https://platform.deepseek.com" target="_blank">platform.deepseek.com</a> 注册 → 左侧 API keys → 创建一个 key 复制好 →
-      左侧充值页面充 1~5 元（每天两次简报的调用量很省，几块钱能用很久）。</p>
+      左侧充值页面充 1~5 元（每天一次简报的调用量很省，几块钱能用很久）。</p>
     </div>
     <div class="card">
       <h3>② QQ邮箱授权码（发信用）</h3>
       <p>登录你的 QQ 邮箱网页版 → 设置 → 账户 → 找到"POP3/IMAP/SMTP服务" → 开启 SMTP 服务 →
       按提示发短信验证 → 会得到一串16位的授权码，复制好（这不是你的QQ密码，是单独生成的）。</p>
-    </div>
-    <div class="card">
-      <h3>③ Supabase 项目（可选，用于早晚去重）</h3>
-      <p>打开 <a href="https://supabase.com" target="_blank">supabase.com</a>，免费注册并新建一个项目 →
-      左侧找到 <b>SQL Editor</b>，把下面这段代码复制进去，点 <b>Run</b> 运行一次（这张表用来记录"今天早上已经发过哪些内容"，晚上那次会自动避开，不会重复）：</p>
-      <div class="secret-row" style="align-items:flex-start;">
-        <pre id="sbSql" style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--dim);white-space:pre-wrap;margin:0;flex:1;">create table if not exists seen_records (
-  date text primary key,
-  items jsonb not null default '[]',
-  updated_at timestamptz default now()
-);</pre>
-        <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;" onclick="navigator.clipboard.writeText(document.getElementById('sbSql').textContent);this.textContent='已复制';setTimeout(()=>this.textContent='复制',1500);">复制</button>
-      </div>
-      <p style="margin-top:10px;">运行成功（显示 <code>Success</code>）之后，左侧点 <b>Project Settings → API</b>，
-      复制 <b>Project URL</b> 和 <b>anon public</b> 这个 key（不是 service_role，那个不能用）。
-      不填这一步也能正常收到简报，只是早晚内容可能会重复。</p>
     </div>
     <div class="card">
       <h3>④ 关于教务网这块</h3>
@@ -297,10 +281,9 @@
       </fieldset>
 
       <fieldset data-q="frequency">
-        <legend><span class="q-num">07</span>希望一天推送几次？</legend>
+        <legend><span class="q-num">07</span>简报发送时间</legend>
         <div class="options" data-type="single">
-          <div class="opt">一天1次（早上）</div>
-          <div class="opt">一天2次（早晚各一次）</div>
+          <div class="opt">每两天早上 7:30</div>
         </div>
       </fieldset>
 
@@ -354,7 +337,7 @@
     <div class="card" style="margin-top:22px;">
       <h3>最后一步：手动测试一次</h3>
       <p>都添加完后，去仓库的 <code>Actions</code> 标签 → 左侧选 workflow → 右边点 <code>Run workflow</code>。
-      跑完（2~3分钟）检查你的邮箱有没有收到简报。之后会按你在 Step 03 里选的频率（一天1次早上7:30，或早7:30/晚21:00各一次）自动发送，不用再管。</p>
+      跑完（2~3分钟）检查你的邮箱有没有收到简报。之后会每两天在早上 7:30 自动发送，不用再管。</p>
     </div>
 
     <div class="mockup">
@@ -375,7 +358,7 @@
         <div class="mockup-row"><span class="k">✅ 拉取代码</span><span class="v">已完成</span></div>
         <div class="mockup-row"><span class="k">✅ 设置 Python</span><span class="v">已完成</span></div>
         <div class="mockup-row"><span class="k">✅ 安装依赖</span><span class="v">已完成</span></div>
-        <div class="mockup-row"><span class="k">🟡 判断早晚班并运行</span><span class="v">运行中...</span></div>
+        <div class="mockup-row"><span class="k">🟡 运行早间简报</span><span class="v">运行中...</span></div>
       </div>
     </div>
 
@@ -607,18 +590,13 @@ document.getElementById("genBtn").addEventListener("click", () => {
     frequency: answers.frequency,
   });
 
-  const freqValue = answers.frequency === "一天2次（早晚各一次）" ? "2" : "1";
-
   const secrets = [
     ["USER_NAME", userName],
     ["USER_PROFILE_TEXT", profileText],
-    ["DAILY_FREQUENCY", freqValue],
     ["DEEPSEEK_API_KEY", "（粘贴你在 Step 2 拿到的 DeepSeek key）"],
     ["QQ_EMAIL", "（你的QQ邮箱地址）"],
     ["QQ_AUTH_CODE", "（你在 Step 2 拿到的16位授权码）"],
     ["SEND_TO", "（想收简报的邮箱，通常和QQ_EMAIL一样）"],
-    ["SUPABASE_URL", "（Step 2 里可选的 Supabase 项目 URL）"],
-    ["SUPABASE_ANON_KEY", "（Step 2 里可选的 Supabase anon key）"],
   ];
 
   const listEl = document.getElementById("secretsList");

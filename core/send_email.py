@@ -8,15 +8,12 @@
 3. 行动建议板块渲染逻辑不变
 4. 结束语挪进底部"今日最该做的一件事"的蓝色框里，更醒目
 5. 内容卡片改为六段式（来源/标题/链接/标签/摘要/一句话点评），卡片顶部新增来源徽标
-6. 当天早晚去重：早上发完邮件后，把当天看过的新闻（标题+链接）记到 D 盘，晚上自动避开
 """
 import os
 import re
 import smtplib
 from email.mime.text import MIMEText
 from email.header import Header
-
-import seen_records
 
 # 邮箱账号/授权码/收件人：从环境变量读取（GitHub Secrets 里配置）
 QQ_EMAIL = os.environ.get("QQ_EMAIL", "")
@@ -67,25 +64,6 @@ def parse_brief(content):
         elif current in sections:
             sections[current] += line + "\n"
     return date, slot, sections
-
-def collect_seen_items(sections):
-    """把邮件里实际展示的新闻（标题+链接）收集起来，供当天晚上去重用"""
-    seen = []
-    seen_urls = set()
-    for key in ("jwc", "top_picks", "tech", "economy", "politics", "science"):
-        for raw_line in sections.get(key, "").split("\n"):
-            parts = _split_line(raw_line, 3)
-            if not parts:
-                continue
-            # jwc 是"标题|||链接|||说明"，其余卡片是"来源|||标题|||链接|||..."
-            title, url = (parts[0], parts[1]) if key == "jwc" else (parts[1], parts[2])
-            if title and url and url not in seen_urls:
-                seen_urls.add(url)
-                seen.append({"title": title, "url": url})
-    return seen
-
-
-
 
 
 def render_overview(text):
@@ -311,8 +289,7 @@ def build_html(date, slot, sections):
     action_html = render_action_advice(sections.get("action", ""))
     opening, closing = render_greeting(sections.get("greeting", ""))
 
-    slot_label = "早安" if slot == "morning" else "晚安"
-    opening_html = f'''<div style="font-size:15px; color:{COLOR_DARK}; background:{COLOR_BG_ACCENT}; border-radius:8px; padding:14px 18px; margin-bottom:16px; line-height:1.6;">{slot_label}👋 {opening}</div>''' if opening else ""
+    opening_html = f'''<div style="font-size:15px; color:{COLOR_DARK}; background:{COLOR_BG_ACCENT}; border-radius:8px; padding:14px 18px; margin-bottom:16px; line-height:1.6;">早安👋 {opening}</div>''' if opening else ""
     closing_in_footer = f'''<div style="font-size:15px; font-weight:600; color:{COLOR_DARK}; margin-top:12px; border-top:1px solid rgba(63,107,143,0.25); padding-top:12px; line-height:1.6;">💌 {closing}</div>''' if closing else ""
 
     tab_bar = f'''
@@ -368,7 +345,7 @@ def send_brief_email():
     date, slot, sections = parse_brief(content)
     html_content = build_html(date, slot, sections)
 
-    slot_tag = "早报" if slot == "morning" else "晚报"
+    slot_tag = "早报"
     msg = MIMEText(html_content, "html", "utf-8")
     msg["From"] = QQ_EMAIL
     msg["To"] = SEND_TO
@@ -380,10 +357,6 @@ def send_brief_email():
             server.sendmail(QQ_EMAIL, [SEND_TO], msg.as_string())
 
         print(f"✅ 简报已发送到 {SEND_TO}")
-
-        if slot == "morning":
-            seen_items = collect_seen_items(sections)
-            seen_records.record_today(date, seen_items)
 
     except Exception as e:
         print(f"❌ 发送失败：{e}")

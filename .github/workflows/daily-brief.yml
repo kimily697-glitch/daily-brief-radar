@@ -3,9 +3,9 @@ name: 每日AI简报
 on:
   schedule:
     # 注意：GitHub Actions 的 cron 是 UTC 时间，北京时间 = UTC + 8
-    # 这里设置：北京时间早上 7:30 (UTC 23:30 前一天) 和 晚上 21:00 (UTC 13:00)
-    - cron: '30 23 * * *'   # 北京时间 07:30 早班
-    - cron: '0 13 * * *'    # 北京时间 21:00 晚班
+    # 每天北京时间早上 07:30（UTC 前一天 23:30）检查一次；
+    # 由下方门禁保证简报每两天实际运行一次，避免 cron 按月份重置造成跨月错位。
+    - cron: '30 23 * * *'
   workflow_dispatch:        # 允许你在 GitHub 网页上手动点按钮触发，方便测试
 
 jobs:
@@ -24,49 +24,23 @@ jobs:
       - name: 安装依赖
         run: pip install -r requirements.txt
 
-      - name: 判断早晚班并运行
+      - name: 运行早间简报
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           QQ_EMAIL: ${{ secrets.QQ_EMAIL }}
           QQ_AUTH_CODE: ${{ secrets.QQ_AUTH_CODE }}
           SEND_TO: ${{ secrets.SEND_TO }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          DAILY_FREQUENCY: ${{ secrets.DAILY_FREQUENCY }}
         run: |
-          # 【修复】GitHub Actions 的 schedule 触发经常会有延迟（官方已知机制，
-          # 高峰期可能晚触发几十分钟甚至更久）。原来的判断只认死板的"UTC 23点整
-          # 这一个小时"，一旦触发延迟错过这个窗口就会被误判成晚班，导致早班经常
-          # 被当成晚班、又因为"一天一次"的设置被直接跳过不发。
-          #
-          # 改成：不再卡死一个小时窗口，而是比较当前时间距离两个 cron 时间点
-          # （UTC 23:30 早班 / UTC 13:00 晚班）谁更近，就归为哪一班，抗延迟能力
-          # 更强，不会再因为触发晚了几十分钟就整班被吃掉。
-          HOUR_UTC=$(date -u +%H)
-          MIN_UTC=$(date -u +%M)
-          TOTAL_MIN=$((10#$HOUR_UTC * 60 + 10#$MIN_UTC))
-
-          # 早班 cron: 23:30 UTC = 1410 分钟；晚班 cron: 13:00 UTC = 780 分钟
-          # 早班时间点在一天的末尾，需要同时考虑"跨天"的情况，取距离较小的那个
-          DIFF_MORNING_1=$(( TOTAL_MIN - 1410 ))
-          DIFF_MORNING_2=$(( TOTAL_MIN + 1440 - 1410 ))
-          ABS_MORNING_1=${DIFF_MORNING_1#-}
-          ABS_MORNING_2=${DIFF_MORNING_2#-}
-          if [ "$ABS_MORNING_1" -le "$ABS_MORNING_2" ]; then
-            ABS_MORNING=$ABS_MORNING_1
-          else
-            ABS_MORNING=$ABS_MORNING_2
+          # 自动运行从北京时间 2026-09-16 07:30 开始每两天一次。
+          # workflow_dispatch 始终允许手动测试，不受此门禁影响。
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            START_DAY=$(date -d '2026-09-16' +%s)
+            BEIJING_TODAY=$(TZ=Asia/Shanghai date +%F)
+            TODAY=$(date -d "$BEIJING_TODAY" +%s)
+            DAYS_ELAPSED=$(( (TODAY - START_DAY) / 86400 ))
+            if [ $(( DAYS_ELAPSED % 2 )) -ne 0 ]; then
+              echo "今天不是两天一次的简报日，跳过发送。"
+              exit 0
+            fi
           fi
-
-          DIFF_EVENING=$(( TOTAL_MIN - 780 ))
-          ABS_EVENING=${DIFF_EVENING#-}
-
-          echo "当前 UTC 时间：${HOUR_UTC}:${MIN_UTC}，距早班 ${ABS_MORNING} 分钟，距晚班 ${ABS_EVENING} 分钟"
-
-          if [ "$ABS_MORNING" -le "$ABS_EVENING" ]; then
-            echo "判定为：早班（morning）"
-            python run_all.py morning
-          else
-            echo "判定为：晚班（evening）"
-            python run_all.py evening
-          fi
+          python run_all.py
